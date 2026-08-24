@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ticket-booking-system
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SEAT_HOLD_TTL_MINUTES
+        value: 10
+      - key: WAITLIST_OFFER_TTL_MINUTES
+        value: 5
+      - key: SWEEPER_INTERVAL_SECONDS
+        value: 5

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Booking Platform • Real-time Visual Seat Map & QR Tickets</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2.5 rounded-xl shadow-md">
+                    <i class="fa-solid fa-ticket text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white">EventMaster</h1>
+                    <p class="text-xs text-slate-400">Real-Time Ticket Booking & Waitlist Platform</p>
+                </div>
+            </div>
+
+            <!-- WebSocket Real-time Status Badge -->
+            <div class="flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs">
+                <span id="wsStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span id="wsStatusText" class="text-slate-300">Connecting Real-time...</span>
+            </div>
+
+            <!-- User Auth Bar / Presets -->
+            <div id="authBar" class="flex items-center space-x-3">
+                <!-- Preset Login Buttons for Quick Testing -->
+                <div class="hidden md:flex items-center space-x-1.5 bg-slate-900 p-1 rounded-lg border border-slate-700 text-xs">
+                    <span class="text-slate-400 px-2 font-medium">Quick Login:</span>
+                    <button onclick="quickLogin('john@example.com', 'cust123')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 transition">👤 Customer</button>
+                    <button onclick="quickLogin('organiser@cinema.com', 'org123')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded text-amber-400 transition">🎬 Organiser</button>
+                    <button onclick="quickLogin('admin@tickets.com', 'admin123')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded text-purple-400 transition">⚙️ Admin</button>
+                </div>
+
+                <div id="userInfoBar" class="hidden items-center space-x-3">
+                    <div class="text-right">
+                        <div id="userName" class="text-sm font-semibold text-white">User</div>
+                        <div id="userRole" class="text-xs text-blue-400 font-mono">CUSTOMER</div>
+                    </div>
+                    <button onclick="logout()" class="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-lg text-xs font-semibold transition">
+                        Logout
+                    </button>
+                </div>
+
+                <button id="loginBtnNav" onclick="openAuthModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow transition">
+                    Sign In / Register
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="bg-slate-800/60 border-b border-slate-700 backdrop-blur">
+        <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto space-x-2 text-sm font-medium">
+            <button onclick="switchTab('eventsTab')" id="tab-eventsTab" class="tab-btn active border-b-2 border-blue-500 text-blue-400 py-3 px-4 flex items-center space-x-2">
+                <i class="fa-solid fa-[#fa8072] fa-film"></i>
+                <span>Events & Seat Map</span>
+            </button>
+            <button onclick="switchTab('bookingsTab')" id="tab-bookingsTab" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-4 flex items-center space-x-2">
+                <i class="fa-solid fa-receipt"></i>
+                <span>My Bookings & QR Tickets</span>
+            </button>
+            <button onclick="switchTab('waitlistTab')" id="tab-waitlistTab" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-4 flex items-center space-x-2">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Waitlist & Offers</span>
+            </button>
+            <button id="organiserTabBtn" onclick="switchTab('organiserTab')" id="tab-organiserTab" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-4 flex items-center space-x-2 hidden">
+                <i class="fa-solid fa-chart-line text-amber-400"></i>
+                <span class="text-amber-300">Organiser Dashboard</span>
+            </button>
+            <button id="adminTabBtn" onclick="switchTab('adminTab')" id="tab-adminTab" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-4 flex items-center space-x-2 hidden">
+                <i class="fa-solid fa-gears text-purple-400"></i>
+                <span class="text-purple-300">Admin Venues</span>
+            </button>
+            <button onclick="switchTab('emailsTab')" id="tab-emailsTab" class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-slate-200 py-3 px-4 flex items-center space-x-2">
+                <i class="fa-solid fa-envelope-open-text text-emerald-400"></i>
+                <span>Sent Tickets Inbox</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Body Container -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
+
+        <!-- Banner Alert / System Info -->
+        <div id="systemNotification" class="hidden mb-6 p-4 rounded-xl border bg-slate-800/80 text-sm shadow flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i id="notifIcon" class="fa-solid fa-circle-info text-blue-400 text-lg"></i>
+                <span id="notifMessage" class="text-slate-200">System Notification</span>
+            </div>
+            <button onclick="dismissNotification()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- TAB 1: Events & Interactive Visual Seat Map -->
+        <section id="eventsTab" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Events Selection List -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-clapperboard text-blue-400"></i>
+                            <span>Upcoming Events</span>
+                        </h2>
+                        <span id="eventCountBadge" class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">0 events</span>
+                    </div>
+
+                    <!-- Category Filter -->
+                    <div class="flex space-x-2 text-xs">
+                        <button onclick="filterEvents('')" class="filter-btn active px-3 py-1.5 bg-blue-600 text-white rounded-lg font-medium">All</button>
+                        <button onclick="filterEvents('Movie')" class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg font-medium">Movies</button>
+                        <button onclick="filterEvents('Concert')" class="filter-btn px-3 py-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg font-medium">Concerts</button>
+                    </div>
+
+                    <!-- Events Container -->
+                    <div id="eventsList" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                        <!-- Loaded dynamically -->
+                        <div class="p-6 text-center text-slate-500 border border-slate-800 rounded-xl">Loading events...</div>
+                    </div>
+                </div>
+
+                <!-- Visual Seat Map & Hold Cart -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div id="seatMapCard" class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                        
+                        <!-- Empty State when no event selected -->
+                        <div id="noEventSelectedState" class="py-20 text-center space-y-3">
+                            <div class="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto text-slate-400 text-2xl">
+                                <i class="fa-solid fa-couch"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-slate-300">Select an Event to View Seat Map</h3>
+                            <p class="text-xs text-slate-400 max-w-sm mx-auto">Choose any movie or concert listing on the left to load real-time seat availability and seat categories.</p>
+                        </div>
+
+                        <!-- Active Seat Map View -->
+                        <div id="activeSeatMapView" class="hidden space-y-6">
+                            
+                            <!-- Header & Countdown Hold Banner -->
+                            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/80 pb-4">
+                                <div>
+                                    <h3 id="selectedEventTitle" class="text-xl font-bold text-white">Event Title</h3>
+                                    <p id="selectedEventMeta" class="text-xs text-slate-400">Venue • Date & Time</p>
+                                </div>
+
+                                <!-- Seat Legend -->
+                                <div class="flex flex-wrap items-center gap-3 text-xs">
+                                    <div class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-emerald-500 shadow"></span><span class="text-slate-300">Available</span></div>
+                                    <div class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-amber-500 animate-pulse"></span><span class="text-slate-300">Held (TTL)</span></div>
+                                    <div class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-rose-600"></span><span class="text-slate-300">Booked</span></div>
+                                    <div class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-blue-500"></span><span class="text-slate-300">Offered</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Screen / Stage Visual Indicator -->
+                            <div class="w-full max-w-md mx-auto py-2 bg-gradient-to-b from-blue-500/20 to-transparent border-t-4 border-blue-400 rounded-t-2xl text-center shadow-lg">
+                                <span class="text-[11px] font-bold uppercase tracking-widest text-blue-300"><i class="fa-solid fa-tv mr-1"></i> SCREEN / STAGE</span>
+                            </div>
+
+                            <!-- Visual Seat Grid -->
+                            <div id="seatGridContainer" class="flex flex-col items-center justify-center space-y-2 py-4 overflow-x-auto min-h-[220px]">
+                                <!-- Dynamically generated seat rows -->
+                            </div>
+
+                            <!-- Category Pricing & Waitlist Bar -->
+                            <div id="categoryPricingBar" class="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 text-xs">
+                                <!-- Category cards dynamically loaded -->
+                            </div>
+
+                            <!-- Active Seat Hold Cart Bar -->
+                            <div id="seatCartBar" class="bg-blue-950/60 border border-blue-500/40 p-4 rounded-xl flex flex-wrap items-center justify-between gap-4">
+                                <div class="space-y-1">
+                                    <div class="text-xs text-blue-300 font-medium flex items-center space-x-2">
+                                        <span>Selected Seats:</span>
+                                        <span id="selectedSeatsBadges" class="font-bold text-white font-mono bg-blue-900 px-2 py-0.5 rounded">None</span>
+                                    </div>
+                                    <div class="text-xs text-slate-400">Total Price: <strong id="cartTotalPrice" class="text-emerald-400 text-sm font-bold">$0.00</strong></div>
+                                </div>
+
+                                <!-- Timer & Action Buttons -->
+                                <div class="flex items-center space-x-3">
+                                    <!-- Hold TTL Countdown Timer -->
+                                    <div id="holdTimerContainer" class="hidden items-center space-x-2 bg-amber-950/80 border border-amber-500/40 px-3 py-1.5 rounded-lg text-amber-300 text-xs font-mono">
+                                        <i class="fa-solid fa-stopwatch animate-spin"></i>
+                                        <span>Expires in: <strong id="holdTimerText">10:00</strong></span>
+                                    </div>
+
+                                    <button id="holdSeatsBtn" onclick="holdSelectedSeats()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg shadow transition">
+                                        Hold Seats (10m TTL)
+                                    </button>
+
+                                    <button id="confirmBookingBtn" onclick="confirmSelectedBooking()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-lg transition">
+                                        Confirm & Pay Ticket
+                                    </button>
+
+                                    <button id="releaseSeatsBtn" onclick="releaseSelectedSeats()" class="hidden px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition">
+                                        Abandon Hold
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- TAB 2: My Bookings & QR Ticket Viewer -->
+        <section id="bookingsTab" class="tab-content hidden">
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-ticket-simple text-emerald-400"></i>
+                        <span>My Confirmed Bookings & QR Tickets</span>
+                    </h2>
+                    <button onclick="loadMyBookings()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Refresh History
+                    </button>
+                </div>
+
+                <div id="bookingsList" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: Waitlist & Time-Limited Offers -->
+        <section id="waitlistTab" class="tab-content hidden">
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+                        <span>Waitlist Queue & Time-Limited Seat Offers</span>
+                    </h2>
+                    <button onclick="loadMyWaitlist()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Waitlist
+                    </button>
+                </div>
+
+                <div id="waitlistList" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: Organiser Dashboard -->
+        <section id="organiserTab" class="tab-content hidden">
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-pie text-amber-400"></i>
+                        <span>Organiser Sales & Revenue Analytics</span>
+                    </h2>
+                    <button onclick="openCreateEventModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold shadow">
+                        + Create New Listing
+                    </button>
+                </div>
+
+                <!-- Stats Overview Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow">
+                        <div class="text-xs text-slate-400 uppercase font-semibold">Total Revenue</div>
+                        <div id="orgRevenueStat" class="text-2xl font-bold text-emerald-400 mt-1">$0.00</div>
+                    </div>
+                    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow">
+                        <div class="text-xs text-slate-400 uppercase font-semibold">Total Tickets Sold</div>
+                        <div id="orgTicketsStat" class="text-2xl font-bold text-blue-400 mt-1">0</div>
+                    </div>
+                    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow">
+                        <div class="text-xs text-slate-400 uppercase font-semibold">Active Events</div>
+                        <div id="orgEventsStat" class="text-2xl font-bold text-purple-400 mt-1">0</div>
+                    </div>
+                </div>
+
+                <!-- Organiser Events Summary Table -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 font-semibold uppercase border-b border-slate-700">
+                            <tr>
+                                <th class="p-3.5">Event Title</th>
+                                <th class="p-3.5">Venue</th>
+                                <th class="p-3.5">Date</th>
+                                <th class="p-3.5 text-center">Available / Held / Sold</th>
+                                <th class="p-3.5 text-right">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody id="organiserTableBody" class="divide-y divide-slate-700">
+                            <!-- Loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: Admin Venue Layout Creator -->
+        <section id="adminTab" class="tab-content hidden">
+            <div class="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-6">
+                <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-building text-purple-400"></i>
+                    <span>Admin Venue Creation & Layout Configurator</span>
+                </h2>
+
+                <form id="createVenueForm" onsubmit="handleCreateVenue(event)" class="space-y-4 text-xs">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Venue Name</label>
+                        <input type="text" id="vName" required placeholder="e.g. IMAX Grand Theatre" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Location / Address</label>
+                        <input type="text" id="vLoc" required placeholder="e.g. 5th Avenue, NY" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Total Rows (A-Z)</label>
+                            <input type="number" id="vRows" min="1" max="26" value="6" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Seats Per Row</label>
+                            <input type="number" id="vSeatsPerRow" min="1" max="50" value="8" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                        </div>
+                    </div>
+                    <p class="text-slate-400 italic">Note: Rows 1-2 auto-designated VIP, Rows 3-4 auto-designated PREMIUM, remaining Rows auto-designated STANDARD.</p>
+                    <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg shadow transition">
+                        Create Venue & Generate Seat Layout Template
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 6: Sent Emails Inbox Previewer -->
+        <section id="emailsTab" class="tab-content hidden">
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-inbox text-emerald-400"></i>
+                        <span>System Sent Email & Ticket Inbox Log</span>
+                    </h2>
+                    <button onclick="loadEmailInbox()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium border border-slate-700">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Email Inbox
+                    </button>
+                </div>
+
+                <div id="emailsList" class="space-y-4">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- AUTH MODAL -->
+    <div id="authModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+
+            <!-- Modal Header -->
+            <div class="text-center mb-6">
+                <h3 id="authModalTitle" class="text-xl font-bold text-white">Sign In to EventMaster</h3>
+                <p class="text-xs text-slate-400 mt-1">Select role and credentials to log in</p>
+            </div>
+
+            <!-- Form -->
+            <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4 text-xs">
+                <div id="nameField" class="hidden">
+                    <label class="block text-slate-300 font-semibold mb-1">Full Name</label>
+                    <input type="text" id="authName" placeholder="John Doe" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Email Address</label>
+                    <input type="email" id="authEmail" required placeholder="john@example.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Password</label>
+                    <input type="password" id="authPassword" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                </div>
+
+                <div id="roleField" class="hidden">
+                    <label class="block text-slate-300 font-semibold mb-1">Account Role</label>
+                    <select id="authRole" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                        <option value="CUSTOMER">Customer (Book seats & view tickets)</option>
+                        <option value="ORGANISER">Organiser (Create listings & view revenue)</option>
+                        <option value="ADMIN">Admin (Manage venues & seat layouts)</option>
+                    </select>
+                </div>
+
+                <button type="submit" id="authSubmitBtn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow transition">
+                    Sign In
+                </button>
+
+                <div class="text-center pt-2">
+                    <button type="button" onclick="toggleAuthMode()" id="authToggleBtn" class="text-blue-400 hover:underline text-xs">
+                        Don't have an account? Register here
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CREATE EVENT MODAL FOR ORGANISER -->
+    <div id="createEventModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-lg rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="closeCreateEventModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+
+            <h3 class="text-xl font-bold text-white mb-4">Create New Movie / Concert Event</h3>
+
+            <form id="createEventForm" onsubmit="handleCreateEvent(event)" class="space-y-4 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Event Title</label>
+                    <input type="text" id="eTitle" required placeholder="e.g. Dune: Part Three" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Description</label>
+                    <textarea id="eDesc" rows="2" placeholder="Synopsis or concert info" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Category</label>
+                        <select id="eCategory" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <option value="Movie">Movie</option>
+                            <option value="Concert">Concert</option>
+                            <option value="Play">Play / Theatre</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Select Venue</label>
+                        <select id="eVenueSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white" required>
+                            <!-- Venues populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Date & Time</label>
+                    <input type="datetime-local" id="eDate" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                </div>
+
+                <!-- Per-Category Pricing -->
+                <div class="border-t border-slate-700 pt-3">
+                    <label class="block text-slate-300 font-semibold mb-2">Set Category Prices ($ USD)</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[10px] text-emerald-400 font-bold block mb-1">VIP Price</label>
+                            <input type="number" id="pVIP" value="30.00" min="1" step="0.5" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-amber-400 font-bold block mb-1">PREMIUM Price</label>
+                            <input type="number" id="pPREMIUM" value="20.00" min="1" step="0.5" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-blue-400 font-bold block mb-1">STANDARD Price</label>
+                            <input type="number" id="pSTANDARD" value="12.00" min="1" step="0.5" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg shadow transition">
+                    Publish Event Listing
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

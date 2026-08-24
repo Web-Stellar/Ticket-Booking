@@ -1,0 +1,82 @@
+/* Custom styles for Ticket Booking Seat Grid */
+
+/* Seat element animation */
+.seat-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.seat-btn:hover:not(:disabled) {
+    transform: scale(1.15);
+    z-index: 10;
+}
+
+/* Category borders */
+.seat-vip {
+    border: 2px solid #38bdf8; /* Light blue border for VIP */
+}
+
+.seat-premium {
+    border: 2px solid #f59e0b; /* Amber border for PREMIUM */
+}
+
+.seat-standard {
+    border: 1px solid #475569; /* Slate border for STANDARD */
+}
+
+/* Status Colors */
+.status-available {
+    background-color: #10b981; /* Emerald 500 */
+    color: #ffffff;
+}
+
+.status-held {
+    background-color: #f59e0b; /* Amber 500 */
+    color: #000000;
+    animation: pulse-hold 2s infinite;
+}
+
+.status-booked {
+    background-color: #e11d48; /* Rose 600 */
+    color: #ffffff;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.status-offered {
+    background-color: #3b82f6; /* Blue 500 */
+    color: #ffffff;
+    animation: pulse-offer 1.5s infinite;
+}
+
+.status-selected {
+    background-color: #8b5cf6 !important; /* Purple 500 for user's pending selection */
+    color: #ffffff !important;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.8);
+    transform: scale(1.15);
+}
+
+@keyframes pulse-hold {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes pulse-offer {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
