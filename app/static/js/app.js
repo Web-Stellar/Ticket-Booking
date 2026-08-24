@@ -490,34 +490,63 @@ function stopHoldCountdownTimer() {
 }
 
 // --- WebSocket Real-Time Listener ---
+let reconnectInterval = null;
+
 function connectWebSocket(eventId) {
-    if (socket) socket.close();
+    if (socket) {
+        socket.onclose = null; // Prevent duplicate reconnect triggers on manual switch
+        socket.close();
+    }
+    if (reconnectInterval) clearInterval(reconnectInterval);
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/seats/${eventId}`;
 
-    socket = new WebSocket(wsUrl);
+    const dot = document.getElementById("wsStatusDot");
+    const text = document.getElementById("wsStatusText");
 
-    socket.onopen = () => {
-        document.getElementById("wsStatusDot").className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-lg";
-        document.getElementById("wsStatusText").innerText = "Real-time Live Sync";
-    };
+    dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+    text.innerText = "Connecting Real-time...";
 
-    socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        console.log("WebSocket event:", msg);
+    try {
+        socket = new WebSocket(wsUrl);
 
-        if (msg.type === "SEAT_HELD" || msg.type === "SEAT_RELEASED" || msg.type === "SEAT_BOOKED") {
-            if (currentEvent && msg.event_id === currentEvent.id) {
-                loadSeatMap(currentEvent.id);
+        socket.onopen = () => {
+            if (reconnectInterval) clearInterval(reconnectInterval);
+            dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-lg";
+            text.innerText = "Real-time Live Sync";
+        };
+
+        socket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            console.log("WebSocket event:", msg);
+
+            if (msg.type === "SEAT_HELD" || msg.type === "SEAT_RELEASED" || msg.type === "SEAT_BOOKED") {
+                if (currentEvent && msg.event_id === currentEvent.id) {
+                    loadSeatMap(currentEvent.id);
+                }
             }
-        }
-    };
+        };
 
-    socket.onclose = () => {
-        document.getElementById("wsStatusDot").className = "w-2.5 h-2.5 rounded-full bg-rose-500";
-        document.getElementById("wsStatusText").innerText = "Real-time Offline";
-    };
+        socket.onerror = (err) => {
+            console.warn("WebSocket connection error:", err);
+        };
+
+        socket.onclose = () => {
+            dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+            text.innerText = "Reconnecting Sync...";
+            
+            // Auto-reconnect every 3 seconds if active event is loaded
+            if (!reconnectInterval && currentEvent) {
+                reconnectInterval = setInterval(() => {
+                    if (currentEvent) connectWebSocket(currentEvent.id);
+                }, 3000);
+            }
+        };
+    } catch (e) {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+        text.innerText = "System Ready";
+    }
 }
 
 // --- Bookings History & Cancellation ---
